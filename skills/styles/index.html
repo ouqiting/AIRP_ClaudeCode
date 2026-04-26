@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Code RP</title>
+<style>
+:root {
+  --bg: #f5f0e8;
+  --surface: #ede6d8;
+  --border: #d4c9b0;
+  --accent: #b06a3d;
+  --accent2: #5a7a5a;
+  --text: #3a3028;
+  --muted: #8a7a65;
+  --input-bg: #fdfaf4;
+  --font-ui: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #c4b9a0; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #a89880; }
+html, body {
+  height: 100vh; overflow: hidden;
+  background: var(--bg); color: var(--text);
+  font-family: var(--font-ui);
+}
+body {
+  display: flex; flex-direction: column;
+  transition: none;
+}
+
+/* ═══ TOP BAR ═══ */
+#topbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 6px 16px;
+  display: flex; align-items: center; gap: 12px;
+  font-size: 0.82em; flex-shrink: 0; min-height: 34px;
+}
+#topbar .dot { width: 7px; height: 7px; border-radius: 50%; }
+#topbar .dot.green { background: #7b9c6e; }
+#topbar .dot.yellow { background: #cc9a56; }
+#topbar .dot.red { background: #b0624a; }
+#topbar .tag {
+  background: var(--accent); color: #fff;
+  padding: 1px 10px; border-radius: 10px;
+  font-size: 0.8em; font-weight: 600; white-space: nowrap;
+}
+#topbar .sep { color: var(--border); }
+#topbar .dim { color: var(--muted); }
+#topbar .spacer { flex: 1; }
+
+/* ═══ MAIN ═══ */
+#main {
+  display: flex; flex: 1; overflow: hidden;
+}
+
+/* ═══ CONTENT ═══ */
+#content-panel {
+  flex: 1; overflow-y: auto; padding: 20px 24px;
+  display: flex; justify-content: center; align-items: flex-start;
+  scroll-behavior: smooth;
+  background: linear-gradient(180deg, #faf7f0 0%, #f5f0e8 100%);
+}
+#content-panel #doc { width: 100%; max-width: 860px; }
+#content-panel #doc > * {
+  border-radius: 6px;
+  box-shadow: 0 1px 6px rgba(0,0,0,.06), 0 0 1px rgba(0,0,0,.04);
+}
+
+/* ═══ TURN DISPLAY ═══ */
+.turn-wrap { margin-bottom: 22px; }
+.turn-role {
+  font-size: 0.7em; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 2.5px; margin-bottom: 5px; padding-left: 2px;
+}
+.turn-user .turn-role { color: var(--accent); }
+.turn-ai .turn-role { color: var(--accent2); }
+.turn-user .turn-text {
+  background: var(--surface);
+  border-left: 3px solid var(--accent);
+  padding: 12px 16px; border-radius: 0 6px 6px 0;
+  font-size: 0.88em; color: var(--muted);
+  line-height: 1.7;
+}
+.turn-ai .turn-text {
+  padding: 4px 0; line-height: 1.9;
+}
+.turn-ai .turn-text content {
+  display: block;
+}
+
+/* ═══ SIDEBAR ═══ */
+#sidebar {
+  width: 300px; flex-shrink: 0;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  overflow-y: auto; padding: 12px;
+  display: flex; flex-direction: column; gap: 8px;
+  font-size: 0.82em;
+}
+.side-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 12px;
+}
+.side-card h4 {
+  font-size: 0.82em; color: var(--accent); margin-bottom: 6px;
+  text-transform: uppercase; letter-spacing: 1px; font-weight: 600;
+}
+.side-card .kv { display: flex; justify-content: space-between; padding: 2px 0; }
+.side-card .kv .k { color: var(--muted); }
+.stat-bar-wrap { background: var(--border); border-radius: 3px; height: 5px; margin: 2px 0 6px; }
+.stat-bar { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+.stat-hp { background: #b0624a; }
+.stat-mp { background: #5a8a9a; }
+.stat-exp { background: #cc9a56; }
+.chip {
+  display: inline-block; padding: 2px 8px; border-radius: 10px;
+  font-size: 0.78em; margin: 2px 3px; cursor: default;
+}
+.chip-hot { background: var(--accent); color: #fff; }
+.chip-normal { background: var(--border); color: var(--muted); }
+/* clickable action chips */
+.chip-action {
+  display: inline-block; padding: 4px 10px; border-radius: 12px;
+  font-size: 0.78em; margin: 3px 4px; cursor: pointer;
+  background: #fdfaf4; color: var(--text);
+  border: 1px solid var(--border);
+  transition: background 0.15s, border-color 0.15s;
+}
+.chip-action:hover { background: #ede6d8; border-color: var(--accent); }
+.chip-action:active { background: var(--accent); color: #fff; }
+.summary-text { color: var(--muted); font-size: 0.82em; line-height: 1.55; }
+/* settings controls */
+.setting-row { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; }
+.setting-row .label { font-size: 0.8em; color: var(--muted); }
+.setting-row select {
+  background: var(--input-bg); color: var(--text); border: 1px solid var(--border);
+  border-radius: 4px; padding: 2px 6px; font-size: 0.78em; font-family: var(--font-ui);
+  cursor: pointer; outline: none; width: 130px;
+}
+.setting-row select:focus { border-color: var(--accent2); }
+.toggle-switch { position: relative; width: 40px; height: 20px; flex-shrink: 0; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+  position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--border); border-radius: 20px; transition: background 0.2s;
+}
+.toggle-slider:before {
+  content: ""; position: absolute; height: 14px; width: 14px;
+  left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: transform 0.2s;
+}
+.toggle-switch input:checked + .toggle-slider { background: var(--accent2); }
+.toggle-switch input:checked + .toggle-slider:before { transform: translateX(20px); }
+#settings-saved { font-size: 0.7em; color: var(--accent2); opacity: 0; transition: opacity 0.3s; }
+#settings-saved.show { opacity: 1; }
+
+/* ═══ INPUT ═══ */
+#input-panel {
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding: 10px 16px; flex-shrink: 0;
+}
+#input-panel .input-row { display: flex; gap: 10px; align-items: flex-end; }
+#input-panel textarea {
+  flex: 1;
+  background: var(--input-bg); color: var(--text);
+  border: 1px solid var(--border); border-radius: 8px;
+  padding: 10px 14px; font-family: var(--font-ui);
+  font-size: 0.9em; line-height: 1.5;
+  resize: none; min-height: 56px; max-height: 110px;
+  outline: none; transition: border-color 0.2s;
+}
+#input-panel textarea:focus { border-color: var(--accent2); }
+.btn-group { display: flex; gap: 6px; flex-shrink: 0; }
+#input-panel button {
+  padding: 8px 18px; border: none; border-radius: 8px;
+  font-size: 0.85em; font-weight: 600; cursor: pointer;
+  transition: background 0.15s; font-family: var(--font-ui);
+}
+.btn-submit { background: var(--accent2); color: #fff; }
+.btn-submit:hover { background: #4a6a4a; }
+.btn-secondary { background: var(--border); color: var(--text); }
+.btn-secondary:hover { background: #c4b9a0; }
+.btn-reroll {
+  font-size: 0.85em; padding: 1px 6px; border: 1px solid var(--border);
+  border-radius: 4px; background: var(--bg); cursor: pointer;
+  color: var(--muted); margin-left: 6px; vertical-align: middle;
+  transition: background 0.15s, color 0.15s;
+}
+.btn-reroll:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn-turn-del {
+  position: absolute; top: 4px; right: 8px;
+  font-size: 0.7em; padding: 2px 7px; border: 1px solid transparent;
+  border-radius: 3px; background: transparent; cursor: pointer;
+  color: var(--muted); opacity: 0; transition: opacity 0.15s, background 0.15s;
+}
+.turn-wrap:hover .btn-turn-del { opacity: 1; }
+.turn-wrap { position: relative; }
+.btn-turn-del:hover { background: #b0624a; color: #fff; border-color: #b0624a; }
+.btn-turn-del.confirming { background: #b0624a; color: #fff; opacity: 1; }
+#input-panel .meta-row {
+  display: flex; gap: 12px; align-items: center; margin-top: 6px;
+  font-size: 0.75em; color: var(--muted);
+}
+#input-panel .meta-row input {
+  background: var(--input-bg); color: var(--text);
+  border: 1px solid var(--border); border-radius: 4px;
+  padding: 2px 8px; font-size: 0.9em; width: 120px;
+  font-family: var(--font-ui); outline: none;
+}
+#input-panel .meta-row input:focus { border-color: var(--accent2); }
+#toast {
+  position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
+  background: var(--accent2); color: #fff;
+  padding: 8px 22px; border-radius: 20px; font-weight: 600;
+  font-size: 0.85em; opacity: 0; transition: opacity 0.3s;
+  pointer-events: none; z-index: 100;
+}
+#toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <span class="dot green"></span>
+  <span class="dot yellow"></span>
+  <span class="dot red"></span>
+  <span class="tag" id="tb-world">—</span>
+  <span class="sep">|</span>
+  <span id="tb-stage">—</span>
+  <span class="sep">|</span>
+  <span class="dim" id="tb-time">—</span>
+  <span class="sep">|</span>
+  <span class="dim" id="tb-location">—</span>
+  <span class="spacer"></span>
+  <span class="dim" style="font-size:0.75em;" id="conn-label">桥接:</span>
+  <span id="conn-dot" class="dot red" title="服务器未连接"></span>
+  <span class="dim" id="tb-count">已生成: 0</span>
+</div>
+
+<div id="main">
+  <div id="content-panel">
+    <div id="doc">等待生成...</div>
+  </div>
+
+  <div id="sidebar">
+    <div class="side-card" id="actions-card" style="display:none;">
+      <h4>📂 可选项</h4>
+      <div id="sb-actions"></div>
+    </div>
+    <div class="side-card">
+      <h4>⚙️ 预设配置 <span id="settings-saved" style="margin-left:4px;">已保存</span></h4>
+      <div class="setting-row">
+        <span class="label">文风</span>
+        <select id="set-style" onchange="saveSettings(); updateStyleDescription()"></select>
+        <div id="style-desc" style="font-size:0.7em;color:var(--muted);margin-top:2px;line-height:1.4;"></div>
+      </div>
+      <div class="setting-row">
+        <span class="label">NSFW</span>
+        <select id="set-nsfw" onchange="saveSettings()">
+          <option>直白</option><option>舒缓</option><option>关闭</option>
+        </select>
+      </div>
+      <div class="setting-row">
+        <span class="label">人称</span>
+        <select id="set-person" onchange="saveSettings()">
+          <option>第二人称</option><option>第三人称</option>
+        </select>
+      </div>
+      <div class="setting-row">
+        <span class="label">字数控制</span>
+        <input type="number" id="set-wordcount" onchange="saveSettings()" min="100" max="3000" step="100" style="width:80px;text-align:center;background:var(--input-bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:0.78em;font-family:var(--font-ui);outline:none;">
+      </div>
+      <div class="setting-row">
+        <span class="label">防抢话</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="set-antiimp" onchange="saveSettings()" checked>
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div class="setting-row">
+        <span class="label">背景NPC</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="set-bgnpc" onchange="saveSettings()">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+    <div class="side-card">
+      <h4>📌 当前目标</h4>
+      <div style="color:var(--accent2);" id="sb-quest">—</div>
+    </div>
+    <div class="side-card" id="stats-card" style="display:none;">
+      <h4>📊 角色状态</h4>
+      <div id="sb-stats"></div>
+    </div>
+    <div class="side-card" id="npcs-card" style="display:none;">
+      <h4>👥 场景人物</h4>
+      <div id="sb-npcs"></div>
+    </div>
+    <div class="side-card" id="openings-card" style="display:none;">
+      <h4>🎬 开场白</h4>
+      <select id="set-opening" onchange="doSwitchOpening()" style="width:100%;padding:4px 6px;border-radius:4px;border:1px solid var(--border);background:var(--input-bg);font-size:0.78em;font-family:var(--font-ui);">
+      </select>
+    </div>
+    <div class="side-card">
+      <h4>📋 剧情摘要</h4>
+      <div class="summary-text" id="sb-summary">暂无</div>
+    </div>
+  </div>
+</div>
+
+<div id="input-panel">
+  <div class="input-row">
+    <textarea id="user-input" placeholder="在此输入你的回复或指令..." rows="2"></textarea>
+    <div class="btn-group">
+      <button class="btn-submit" onclick="doSubmit()">▶ 提交</button>
+      <button class="btn-secondary" onclick="doClear()">清空</button>
+    </div>
+  </div>
+  <div class="meta-row">
+    <span>你的角色名:</span>
+    <input id="char-name" placeholder="可选" value="">
+    <span style="flex:1;"></span>
+    <span id="last-action" style="font-style:italic;"></span>
+  </div>
+</div>
+
+<div id="toast">✓ 已复制到剪贴板，请粘贴到 Claude Code</div>
+
+<script>
+// ═══ Dynamic script reloader (no page flash) ═══
+let pollTimer = null;
+let lastStateMtime = 0;
+let lastContentMtime = 0;
+
+function reloadData() {
+  // Reload state.js via dynamic script
+  const ts = Date.now();
+  const oldState = document.getElementById('_state_js');
+  if (oldState) oldState.remove();
+  const s = document.createElement('script');
+  s.id = '_state_js';
+  s.src = 'state.js?v=' + ts;
+  s.onload = () => {
+    if (window.STATE) lastStateMtime = ts;
+    const oldContent = document.getElementById('_content_js');
+    if (oldContent) oldContent.remove();
+    const c = document.createElement('script');
+    c.id = '_content_js';
+    c.src = 'content.js?v=' + ts;
+    c.onload = () => { if (window.CONTENT_HTML !== undefined) lastContentMtime = ts; render(); };
+    c.onerror = () => render();
+    document.head.appendChild(c);
+  };
+  s.onerror = () => {
+    const oldContent = document.getElementById('_content_js');
+    if (oldContent) oldContent.remove();
+    const c = document.createElement('script');
+    c.id = '_content_js';
+    c.src = 'content.js?v=' + ts;
+    c.onload = () => { if (window.CONTENT_HTML !== undefined) lastContentMtime = ts; render(); };
+    c.onerror = () => render();
+    document.head.appendChild(c);
+  };
+  document.head.appendChild(s);
+}
+
+function userName() {
+  const v = document.getElementById('char-name').value.trim();
+  return v || '{{user}}';
+}
+
+function replaceUser(s) {
+  const name = userName();
+  if (name === '{{user}}' || !s) return s;
+  return s.split('{{user}}').join(name);
+}
+
+function render() {
+  if (!window.STATE) return;
+  const S = window.STATE;
+  document.title = (S.world || 'RP') + ' — ' + (S.stage || '');
+
+  // Top bar (only update if changed to avoid DOM flicker)
+  setText('tb-world', replaceUser(S.world || '—'));
+  setText('tb-stage', S.stage || '—');
+  setText('tb-time', S.time || '—');
+  setText('tb-location', S.location || '—');
+  setText('tb-count', '已生成: ' + (S.generatedCount || 0));
+
+  // Content
+  const contentEl = document.getElementById('doc');
+  let newContent = window.CONTENT_HTML || '<div style="padding:60px;text-align:center;color:var(--muted);">等待生成内容...</div>';
+  newContent = replaceUser(newContent);
+  if (contentEl.innerHTML !== newContent) {
+    contentEl.innerHTML = newContent;
+    // Only auto-scroll if user is already near the bottom
+    const panel = document.getElementById('content-panel');
+    if (panel) {
+      const distToBottom = panel.scrollHeight - (panel.scrollTop + panel.clientHeight);
+      if (distToBottom < 200) {
+        setTimeout(() => { panel.scrollTop = panel.scrollHeight; }, 80);
+      }
+    }
+  }
+
+  // Sidebar
+  setText('sb-quest', replaceUser(S.quest || '—'));
+  const sum = replaceUser(window.SUMMARY_TEXT || '暂无');
+  setText('sb-summary', sum);
+
+  // Actions — prefer per-turn TURN_OPTIONS, fall back to static S.actions
+  const actionsCard = document.getElementById('actions-card');
+  const turnOpts = window.TURN_OPTIONS;
+  const actionsH4 = actionsCard.querySelector('h4');
+  const actionsDiv = document.getElementById('sb-actions');
+  if (turnOpts && turnOpts.length > 0) {
+    actionsCard.style.display = '';
+    if (actionsH4) actionsH4.innerHTML = '🎯 下一步行动' + (S.generatedCount > 0 ? ' <button class="btn-reroll" onclick="doReroll()" title="重roll最后一轮">🔄</button>' : '');
+    renderOptions(actionsDiv, turnOpts);
+  } else if (S.actions && S.actions.length > 0) {
+    actionsCard.style.display = '';
+    if (actionsH4) actionsH4.innerHTML = '📂 可选项' + (S.generatedCount > 0 ? ' <button class="btn-reroll" onclick="doReroll()" title="重roll最后一轮">🔄</button>' : '');
+    renderOptions(actionsDiv, S.actions);
+  } else {
+    actionsCard.style.display = 'none';
+  }
+
+
+  // Stats
+  const statsCard = document.getElementById('stats-card');
+  if (S.player && (S.hpMax > 0 || S.mpMax > 0)) {
+    statsCard.style.display = '';
+    const hpPct = (S.hp / (S.hpMax || 1) * 100).toFixed(0);
+    const mpPct = (S.mp / (S.mpMax || 1) * 100).toFixed(0);
+    const expPct = S.expMax ? (S.exp / S.expMax * 100).toFixed(0) : 0;
+    setHtml('sb-stats',
+      `<div class="kv"><span>${S.player || '角色'}${S.ed ? ' (已ED)' : ''}</span></div>` +
+      `<div class="kv"><span class="k">HP</span><span>${S.hp}/${S.hpMax}</span></div>` +
+      `<div class="stat-bar-wrap"><div class="stat-bar stat-hp" style="width:${hpPct}%"></div></div>` +
+      `<div class="kv"><span class="k">MP</span><span>${S.mp}/${S.mpMax}</span></div>` +
+      `<div class="stat-bar-wrap"><div class="stat-bar stat-mp" style="width:${mpPct}%"></div></div>` +
+      `<div class="kv"><span class="k">EXP</span><span>${S.exp}/${S.expMax}</span></div>` +
+      `<div class="stat-bar-wrap"><div class="stat-bar stat-exp" style="width:${expPct}%"></div></div>`
+    );
+  } else {
+    statsCard.style.display = 'none';
+  }
+
+  // NPCs
+  const npcsCard = document.getElementById('npcs-card');
+  if (S.npcs && S.npcs.length > 0) {
+    npcsCard.style.display = '';
+    setHtml('sb-npcs', S.npcs.map(n =>
+      `<span class="chip ${n.important ? 'chip-hot' : 'chip-normal'}">${replaceUser(n.name)}</span>`
+    ).join(''));
+  } else {
+    npcsCard.style.display = 'none';
+  }
+
+  // Inject per-turn delete buttons
+  injectTurnButtons();
+
+  // Openings switcher visibility
+  updateOpeningsCard(S);
+}
+
+function updateOpeningsCard(S) {
+  const card = document.getElementById('openings-card');
+  const sel = document.getElementById('set-opening');
+  if (S.generatedCount === 1 && sel.options.length > 1) {
+    card.style.display = '';
+  } else {
+    card.style.display = 'none';
+  }
+}
+
+
+function injectTurnButtons() {
+  const doc = document.getElementById('doc');
+  const turns = doc.querySelectorAll('.turn-wrap');
+  turns.forEach(function(turn, i) {
+    // Remove existing btn if any
+    const old = turn.querySelector('.btn-turn-del');
+    if (old) old.remove();
+    // Don't add delete on first opening turn (index 0) if we want to keep the opener
+    const btn = document.createElement('button');
+    btn.className = 'btn-turn-del';
+    btn.textContent = '↩ 回退到此';
+    btn.title = '删除此轮及之后所有内容';
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (btn.classList.contains('confirming')) {
+        doDeleteFrom(i);
+      } else {
+        btn.classList.add('confirming');
+        btn.textContent = '确认回退？';
+        setTimeout(function() {
+          btn.classList.remove('confirming');
+          btn.textContent = '↩ 回退到此';
+        }, 3000);
+      }
+    });
+    const aiDiv = turn.querySelector('.turn-ai');
+    if (aiDiv) aiDiv.appendChild(btn);
+  });
+}
+
+// DOM helpers that only touch if changed
+function setText(id, val) {
+  const el = document.getElementById(id);
+  if (el && el.textContent !== val) el.textContent = val;
+}
+function setHtml(id, val) {
+  const el = document.getElementById(id);
+  if (el && el.innerHTML !== val) el.innerHTML = val;
+}
+
+function renderOptions(container, opts) {
+  container.innerHTML = '';
+  opts.forEach(function(optHtml) {
+    const span = document.createElement('span');
+    span.className = 'chip-action';
+    span.innerHTML = optHtml;
+    span.addEventListener('click', function() {
+      const tmp = document.createElement('div');
+      tmp.innerHTML = optHtml;
+      const plainText = (tmp.textContent || tmp.innerText || '').trim();
+      const ta = document.getElementById('user-input');
+      ta.value = ta.value ? ta.value + '\n' + plainText : plainText;
+      ta.focus();
+    });
+    container.appendChild(span);
+  });
+}
+
+function pickAction(action) {
+  const ta = document.getElementById('user-input');
+  const tmp = document.createElement('div');
+  tmp.innerHTML = action;
+  const plainText = (tmp.textContent || tmp.innerText || action).trim();
+  ta.value = ta.value ? ta.value + '\n' + plainText : plainText;
+  ta.focus();
+}
+
+const BRIDGE = 'http://localhost:8765';
+let bridgeOk = false;
+
+async function doReroll() {
+  const btn = document.querySelector('.btn-reroll');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+  try {
+    const r = await fetch(BRIDGE + '/api/reroll', { method: 'POST' });
+    const data = await r.json();
+    if (data.ok) {
+      showToast('🔄 已触发重roll，等待重新生成...');
+      // Poll more frequently for a bit
+      let tries = 0;
+      const check = setInterval(function() {
+        reloadData();
+        tries++;
+        if (tries > 20) clearInterval(check); // stop after ~60s
+      }, 2500);
+      setTimeout(function() { clearInterval(check); }, 60000);
+    } else {
+      showError('重roll失败: ' + (data.error || '未知错误'));
+    }
+  } catch(e) {
+    showError('无法连接服务器');
+  }
+  if (btn) { btn.disabled = false; btn.textContent = '🔄'; }
+}
+
+async function loadOpenings() {
+  try {
+    const r = await fetch(BRIDGE + '/api/openings');
+    if (!r.ok) return;
+    const openings = await r.json();
+    const sel = document.getElementById('set-opening');
+    sel.innerHTML = openings.map(function(o) {
+      return '<option value=\"' + o.id + '\">' + o.label + '</option>';
+    }).join('');
+    if (openings.length <= 1) {
+      document.getElementById('openings-card').style.display = 'none';
+    }
+  } catch(e) { /* server not ready */ }
+}
+
+async function doSwitchOpening() {
+  const sel = document.getElementById('set-opening');
+  const openingId = parseInt(sel.value);
+  if (isNaN(openingId)) return;
+  try {
+    const r = await fetch(BRIDGE + '/api/switch_opening', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ opening_id: openingId })
+    });
+    const data = await r.json();
+    if (data.ok) {
+      showToast('✓ 已切换开场白');
+      reloadData();
+    } else {
+      showError('切换失败: ' + (data.error || '未知错误'));
+    }
+  } catch(e) {
+    showError('无法连接服务器');
+  }
+}
+
+async function doDeleteFrom(index) {
+  try {
+    const r = await fetch(BRIDGE + '/api/delete_turns', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from_index: index })
+    });
+    const data = await r.json();
+    if (data.ok) {
+      showToast('✓ 已回退，可重新输入');
+      reloadData();
+    } else {
+      showError('回退失败: ' + (data.error || '未知错误'));
+    }
+  } catch(e) {
+    showError('无法连接服务器');
+  }
+}
+
+async function checkBridge() {
+  try {
+    const r = await fetch(BRIDGE + '/api/pending');
+    bridgeOk = r.ok;
+  } catch(e) {
+    bridgeOk = false;
+  }
+  document.getElementById('conn-dot').className = bridgeOk ? 'dot green' : 'dot red';
+  document.getElementById('conn-dot').title = bridgeOk ? '服务器已连接' : '服务器未连接 — 请运行 python skills/server.py';
+}
+
+async function doSubmit() {
+  const input = document.getElementById('user-input').value.trim();
+  const charName = document.getElementById('char-name').value.trim();
+  if (!input) return;
+
+  const btn = document.querySelector('.btn-submit');
+  btn.disabled = true; btn.textContent = '...';
+
+  try {
+    const r = await fetch(BRIDGE + '/api/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: input, charName: charName })
+    });
+    const data = await r.json();
+    if (data.ok) {
+      document.getElementById('user-input').value = '';
+      const toast = document.getElementById('toast');
+      toast.textContent = '✓ 已发送，等待 Claude Code 回应...';
+      toast.style.background = 'var(--accent2)';
+      toast.classList.add('show');
+      document.getElementById('last-action').textContent = '上次提交: ' + new Date().toLocaleTimeString();
+      setTimeout(() => toast.classList.remove('show'), 2500);
+    } else {
+      showError('发送失败: ' + (data.error || '未知错误'));
+    }
+  } catch(e) {
+    showError('无法连接服务器 — 请确保已运行 python skills/server.py');
+  }
+  btn.disabled = false; btn.textContent = '▶ 提交';
+}
+
+function showError(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = '✗ ' + msg;
+  toast.style.background = '#b0624a';
+  toast.classList.add('show');
+  setTimeout(() => { toast.classList.remove('show'); toast.style.background = 'var(--accent2)'; }, 3000);
+}
+
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.style.background = 'var(--accent2)';
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+function doClear() {
+  document.getElementById('user-input').value = '';
+  document.getElementById('user-input').focus();
+}
+
+document.getElementById('user-input').addEventListener('keydown', function(e) {
+  if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); doSubmit(); }
+});
+
+// ═══ Settings ═══
+let styleProfiles = [];
+
+async function loadStyleProfiles() {
+  try {
+    const r = await fetch(BRIDGE + '/api/style-profiles');
+    if (!r.ok) return;
+    styleProfiles = await r.json();
+    const sel = document.getElementById('set-style');
+    const currentValue = sel.value;
+    sel.innerHTML = styleProfiles.map(function(p) {
+      return '<option value="' + p.name + '">' + p.title + '</option>';
+    }).join('');
+    if (currentValue) sel.value = currentValue;
+    updateStyleDescription();
+  } catch(e) { /* server not ready */ }
+}
+
+function updateStyleDescription() {
+  const sel = document.getElementById('set-style');
+  const name = sel ? sel.value : '';
+  const profile = styleProfiles.find(function(p) { return p.name === name; });
+  const desc = document.getElementById('style-desc');
+  if (desc) desc.textContent = profile ? profile.description : '';
+}
+
+async function loadSettings() {
+  try {
+    const r = await fetch(BRIDGE + '/api/settings');
+    if (!r.ok) return;
+    const s = await r.json();
+    await loadStyleProfiles();
+    document.getElementById('set-style').value = s.style || '北棱特调';
+    updateStyleDescription();
+    document.getElementById('set-nsfw').value = s.nsfw || '直白';
+    document.getElementById('set-person').value = s.person || '第二人称';
+    document.getElementById('set-antiimp').checked = s.antiImpersonation !== false;
+    document.getElementById('set-bgnpc').checked = s.bgNpc === true;
+    document.getElementById('set-wordcount').value = s.wordCount || 600;
+    if (s.charName) document.getElementById('char-name').value = s.charName;
+  } catch(e) { /* server may not be ready yet */ }
+}
+
+async function saveSettings() {
+  const data = {
+    style: document.getElementById('set-style').value,
+    nsfw: document.getElementById('set-nsfw').value,
+    person: document.getElementById('set-person').value,
+    antiImpersonation: document.getElementById('set-antiimp').checked,
+    bgNpc: document.getElementById('set-bgnpc').checked,
+    wordCount: parseInt(document.getElementById('set-wordcount').value) || 600,
+    charName: document.getElementById('char-name').value.trim()
+  };
+  try {
+    await fetch(BRIDGE + '/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    updateStyleDescription();
+    const badge = document.getElementById('settings-saved');
+    badge.classList.add('show');
+    setTimeout(() => badge.classList.remove('show'), 1500);
+  } catch(e) { /* offline */ }
+}
+
+// Also save char name when it changes
+function onCharNameChange() {
+  saveSettings();
+  render();
+}
+document.getElementById('char-name').addEventListener('input', function() {
+  // Debounce
+  clearTimeout(this._timer);
+  this._timer = setTimeout(onCharNameChange, 600);
+});
+
+// No page flash: use dynamic script reloading instead of meta refresh
+reloadData();
+checkBridge();
+loadSettings();
+loadOpenings();
+pollTimer = setInterval(reloadData, 3000);
+setInterval(checkBridge, 5000);
+setInterval(loadStyleProfiles, 15000);
+</script>
+</body>
+</html>

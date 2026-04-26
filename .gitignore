@@ -1,0 +1,23 @@
+# Python bytecode cache
+__pycache__/
+*.pyc
+
+# Runtime-generated files (auto-rebuilt by handler.py)
+skills/styles/content.js
+skills/styles/state.js
+
+# User input buffer (runtime only)
+skills/styles/input.txt
+
+# Card path config (runtime routing)
+skills/styles/.card_path
+
+# Temporary response file
+skills/styles/response.txt
+
+# Pending signal file
+skills/styles/.pending
+
+# Lock files
+*.lock
+scheduled_tasks.lock

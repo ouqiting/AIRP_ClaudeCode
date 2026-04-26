@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 *)",
+      "Bash(python *)",
+      "Bash(curl -s http://localhost:8765/api/pending)",
+      "Bash(pkill -f \"server.py\")",
+      "Bash(curl -s http://localhost:8765/api/settings)",
+      "Bash(nohup python *)",
+      "Bash(echo \"started PID: $!\")",
+      "Bash(echo \"PID=$!\")",
+      "Read(//tmp/**)",
+      "Bash(netstat -ano)",
+      "Bash(taskkill //F //PID 35324 //PID 24392 //PID 34264 //PID 7780)"
+    ]
+  }
+}
