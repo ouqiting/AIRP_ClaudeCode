@@ -99,12 +99,33 @@ NSFW 档位（舒缓/直白/关闭） · 人称切换 · 字数控制（100–30
 
 ## 🚀 快速开始
 
+### 环境配置（一键脚本）
+
+项目根目录提供了两个配置脚本，自动完成 Node.js / Git 检查、Claude Code 安装、DeepSeek API 环境变量写入（注册表持久化）、PowerShell Profile 备份：
+
+| 文件 | 说明 |
+|------|------|
+| `setup-deepseek-claude.bat` | 双击运行，自动提权启动 PowerShell 执行配置 |
+| `setup-deepseek-claude.ps1` | 核心脚本，右键「使用 PowerShell 运行」也可直接启动 |
+
+运行后按提示输入 DeepSeek API Key 即可。脚本会自动写入以下环境变量（持久化到用户注册表，重启后仍有效）：
+
+```
+ANTHROPIC_BASE_URL            = https://api.deepseek.com/anthropic
+ANTHROPIC_MODEL               = deepseek-v4-pro
+ANTHROPIC_DEFAULT_OPUS_MODEL  = deepseek-v4-pro
+ANTHROPIC_DEFAULT_SONNET_MODEL= deepseek-v4-pro
+ANTHROPIC_DEFAULT_HAIKU_MODEL = deepseek-v4-flash
+CLAUDE_CODE_SUBAGENT_MODEL    = deepseek-v4-flash
+CLAUDE_CODE_EFFORT_LEVEL      = max
+```
+
 ### 前置要求
 
 | 依赖 | 说明 |
 |------|------|
 | **Python 3.x** | 仅用标准库（`http.server`），无需 pip install |
-| **Claude Code** | AI 编排引擎，读取 `CLAUDE.md` 执行规则 |
+| **Claude Code** | AI 编排引擎，读取 `CLAUDE.md` 执行规则（由上述脚本自动安装） |
 | **现代浏览器** | 访问 `http://localhost:8765` |
 
 ### 运行模式：一卡一文件夹
@@ -135,6 +156,9 @@ Claude Code 启动时会自动扫描**当前文件夹**下的素材：
 ### 三步启动
 
 ```bash
+# 0. 首次使用：运行环境配置脚本（仅需一次）
+#    双击 setup-deepseek-claude.bat → 输入 DeepSeek API Key → 完成
+
 # 1. 在项目根目录下新建一个文件夹，放入角色卡/小说
 mkdir 我的角色
 # 将角色卡.png、世界书.json、小说.txt 等素材放入该文件夹
@@ -174,6 +198,8 @@ python {ROOT}/skills/server.py &
 
 ```
 {ROOT}/
+├── setup-deepseek-claude.bat     # ⚙️ 环境一键配置（双击运行）
+├── setup-deepseek-claude.ps1     # ⚙️ 环境配置核心脚本
 ├── CLAUDE.md                     # 🧠 系统编排核心（规则/权限/流程）
 ├── README.md                     # 📄 本文件
 ├── extract-png-card.md           # 📘 PNG chunk 角色卡解析参考
