@@ -11,17 +11,19 @@
 ### 文件读取（Read 工具）
 - `{ROOT}/skills/styles/` 下所有文件：`state.js`, `content.js`, `input.txt`, `settings.json`, `.pending`, `.card_path`, `openings.json`, `index.html`
 - `{ROOT}/skills/styles/profiles/` 下所有 `.md` 文件 — 文风配置读写
-- 当前卡片文件夹（如 `{ROOT}/我的角色/`）下的 `chat_log.json` 和 `.card_data.json`
+- 当前卡片文件夹（如 `{ROOT}/我的角色/`）下的 `chat_log.json`、`.card_data.json`、`state.js`、`content.js`
 - 当前卡片文件夹下的 `memory/` 目录及其所有 `.md` 文件 — 跨会话记忆
-- `{ROOT}/skills/handler.py`, `{ROOT}/skills/server.py`, `{ROOT}/skills/poll.py`
+- `{ROOT}/skills/handler.py`, `{ROOT}/skills/server.py`, `{ROOT}/skills/poll.py`, `{ROOT}/skills/cleanup.py`
 - `{ROOT}/STORY.md` — 叙事理论框架，剧情规划时读取
 - `{ROOT}/CLAUDE.md`
 
 ### 文件写入（Write 工具 / Bash）
 - `{ROOT}/skills/styles/response.txt` — 每轮生成叙事回复
-- `{ROOT}/skills/styles/state.js` — 更新场景状态
+- `{ROOT}/skills/styles/state.js` — 模板文件（只读）
+- 当前卡片文件夹下的 `state.js` — 更新场景状态（每卡独立）
 - `{ROOT}/skills/styles/.card_path` — 写入卡片文件夹路径
-- `{ROOT}/skills/styles/content.js` — handler.py 自动重建（Bash 中执行）
+- `{ROOT}/skills/styles/content.js` — 模板文件（只读）
+- 当前卡片文件夹下的 `content.js` — handler.py 自动重建（每卡独立）
 - `{ROOT}/skills/styles/openings.json` — 开场白数据
 - 卡片文件夹（如 `{ROOT}/我的角色/`）下的 `chat_log.json` — handler.py 自动管理
 - 当前卡片文件夹下的 `memory/` 目录及 `MEMORY.md`、`project.md`、`reference.md`、`feedback.md`、`user.md` — 跨会话记忆读写
@@ -38,6 +40,7 @@
 - `python "{ROOT}/skills/handler.py" "<卡片文件夹>" [--opening]` — 处理回合 / 开局
 - `python "{ROOT}/skills/import_card.py" "<卡片文件夹>" "{ROOT}"` — 一键导入角色卡/世界书，解析 PNG/JSON/TXT 并初始化 memory
 - `python "{ROOT}/skills/token_collector.py" "{ROOT}"` — 采集 DeepSeek 真实 token 用量写入 response.txt
+- `python "{ROOT}/skills/cleanup.py"` — 一键清理：杀进程 + 释放端口 + 清除 pending 残留
 - `python -c "..."` — 临时脚本（字符编码修复、JSON 检查、进程管理等）
 - `sleep 2` — 等待服务器就绪
 - `netstat -ano | grep :8765` — 检查端口占用
@@ -57,11 +60,11 @@
 当你被启动时，**在回复用户任何话之前**，按顺序自动执行以下步骤：
 
 ### 0. 清理残留进程
-**每次启动必须先执行**——杀掉上次会话可能遗留的 server/poll 进程，释放端口：
+**每次启动必须先执行**——杀掉上次会话可能遗留的 server/poll 进程，释放端口，清除 pending 残留：
 ```
-powershell -Command "Get-Process python | Where-Object { $_.CommandLine -like '*skills*' } | Stop-Process -Force" 2>/dev/null
+python "{ROOT}/skills/cleanup.py"
 ```
-然后确认端口干净：`netstat -ano | grep :8765 | grep LISTENING` 应无输出。
+该脚本自动完成：杀掉 skills 相关 python 进程 → 释放 8765 端口 → 删除 .pending + 清空 input.txt。
 
 ### 1. 启动桥接服务器
 先检查服务器是否已在运行：`curl -s http://localhost:8765/api/pending`
@@ -150,30 +153,11 @@ python "{ROOT}/skills/import_card.py" "<卡片文件夹>" "{ROOT}"
 ```
 
 ### 5. 初始化状态文件
-根据提取到的素材，创建/覆盖以下文件：
+`state.js` 和 `content.js` 为**每卡独立**文件，存储在角色卡目录下（而非全局 `skills/styles/`）。切换角色卡时互不覆盖。
 
-**`{ROOT}/skills/styles/state.js`**：填入初始 STATE
-```javascript
-window.STATE = {
-  world: "（世界名）",
-  stage: "开局",
-  time: "（起始时间）",
-  location: "（起始地点）",
-  env: "（环境描写）",
-  quest: "当前目标",
-  generatedCount: 0,
-  totalTokens: 0,
-  actions: [],
-  player: "", hp: 0, hpMax: 0, mp: 0, mpMax: 0, exp: 0, expMax: 0, ed: false,
-  npcs: []
-};
-```
-
-**`{ROOT}/skills/styles/content.js`**：初始为空模板
-```javascript
-window.CONTENT_HTML = '<div style="padding:60px;text-align:center;color:#999;">正在生成开场...</div>';
-window.SUMMARY_TEXT = '';
-```
+- **`{ROOT}/skills/styles/state.js`** 和 **`content.js`** 是模板文件，不要修改。
+- **import_card.py 已自动将模板复制到角色卡目录**（仅首次，不覆盖已有文件）。
+- 若角色卡目录下尚无这两个文件，手动从 `skills/styles/` 复制过去。
 
 **`./chat_log.json`**（当前卡片文件夹）：若不存在则创建空数组 `[]`。
 
@@ -196,7 +180,7 @@ window.SUMMARY_TEXT = '';
 
 1. 将开局内容按下方「输出格式」写入 `{ROOT}/skills/styles/response.txt`（开局无 `<polished_input>`）
 2. 执行：`python "{ROOT}/skills/handler.py" "<卡片文件夹绝对路径>" --opening`
-3. handler.py 自动完成：chat_log.json 追加、content.js 重建、state.js 更新、/api/done 调用
+3. handler.py 自动完成：chat_log.json 追加、角色卡目录下 content.js 重建、state.js 更新、/api/done 调用
 4. 主动向用户描述当前场景，邀请在浏览器中回复
 
 ## 每轮处理
@@ -270,7 +254,7 @@ total: NNNN
 - `<summary>` 为纯文本，不含 HTML
 - `<tokens>` 内为从 Claude Code session transcript 读取的 DeepSeek 真实 token 计数：`in` 输入 token，`out` 输出 token，`total` 合计。步骤 6.3 的脚本在生成完成后自动从 transcript 采集并附加到 response.txt。
 - `<options>` 内每行一个 `<font>` 标签
-- handler.py 自动完成：解析标签 → 追加 chat_log → 重建 content.js（自动剥离 options/summary 显示） → 更新 state.js → 调用 /api/done
+- handler.py 自动完成：解析标签 → 追加 chat_log → 重建角色卡目录下 content.js（自动剥离 options/summary 显示） → 更新 state.js → 调用 /api/done
 
 ## 剧情规划
 
@@ -293,7 +277,7 @@ total: NNNN
 ### 规划流程
 
 1. **读取 STORY.md**（`{ROOT}/STORY.md`）——叙事理论框架全文
-2. **读取状态**：`state.js`（generatedCount/time/location/npcs）、`memory/project.md`（当前剧情摘要）、`memory/reference.md`（世界观规则）
+2. **读取状态**：角色卡目录下 `state.js`（generatedCount/time/location/npcs）、`memory/project.md`（当前剧情摘要）、`memory/reference.md`（世界观规则）
 3. **读取最近 5 轮 chat_log**：只读最近 5 个 entry（避免全量读取），获取细节
 4. **应用 STORY.md 框架分析**（作为可选透镜，非强制检查）：
    a. **价值转换检查**（麦基场景检验）：最近 5 轮每轮是否有有效价值变化？**NSFW/氛围沉浸/日常温情场景豁免**——这些场景的"停滞"是合法的，目的是建立亲密感而非推进故事。

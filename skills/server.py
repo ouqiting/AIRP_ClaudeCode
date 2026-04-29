@@ -216,6 +216,21 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self._json(settings)
             return
 
+        # Serve state.js / content.js from card folder (per-card storage)
+        if parsed.path in ("/state.js", "/content.js"):
+            card = _card_folder()
+            filename = parsed.path.lstrip("/")
+            if card:
+                card_file = Path(card) / filename
+                if card_file.exists():
+                    self._serve_js(card_file)
+                    return
+            # Fallback to styles/ template
+            fallback = ROOT / filename
+            if fallback.exists():
+                self._serve_js(fallback)
+                return
+
         # Default: serve static files
         super().do_GET()
 
@@ -227,6 +242,16 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    def _serve_js(self, filepath):
+        """Serve a JS file with no-cache headers."""
+        content = filepath.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/javascript; charset=utf-8")
+        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+        self.send_header("Content-Length", str(len(content)))
+        self.end_headers()
+        self.wfile.write(content)
 
     def do_OPTIONS(self):
         self.send_response(200)
