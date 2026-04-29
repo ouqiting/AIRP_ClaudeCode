@@ -62,14 +62,14 @@ def write_chat_log(card_folder, log):
         json.dump(log, f, ensure_ascii=False, indent=2)
 
 
-def read_state():
-    path = STYLES / "state.js"
+def read_state(card_folder=None):
+    path = Path(card_folder) / "state.js" if card_folder else STYLES / "state.js"
     with open(path, "r", encoding="utf-8") as f:
         return f.read()
 
 
-def write_state(js):
-    path = STYLES / "state.js"
+def write_state(js, card_folder=None):
+    path = Path(card_folder) / "state.js" if card_folder else STYLES / "state.js"
     with open(path, "w", encoding="utf-8") as f:
         f.write(js)
 
@@ -123,7 +123,7 @@ def write_content_js(card_folder):
         "window.TURN_TOKENS = " + json.dumps(turn_tokens, ensure_ascii=False) + ";\n"
     )
 
-    path = STYLES / "content.js"
+    path = Path(card_folder) / "content.js"
     with open(path, "w", encoding="utf-8") as f:
         f.write(js)
 
@@ -132,9 +132,9 @@ def _escape_attr(s):
     return s.replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-def update_state(**kwargs):
+def update_state(card_folder=None, **kwargs):
     """Update fields in state.js. Keys: stage, time, location, env, quest, generatedCount, npcs, etc."""
-    raw = read_state()
+    raw = read_state(card_folder)
     for key, value in kwargs.items():
         if isinstance(value, str):
             raw = re.sub(rf'(\s+{key}:\s*")[^"]*(")', rf'\g<1>{value}\g<2>', raw)
@@ -142,7 +142,7 @@ def update_state(**kwargs):
             raw = re.sub(rf'(\s+{key}:\s*)\d+', rf'\g<1>{value}', raw)
         elif isinstance(value, list):
             raw = re.sub(rf'(\s+{key}:\s*)\[.*?\]', lambda m: m.group(1) + json.dumps(value, ensure_ascii=False), raw, flags=re.DOTALL)
-    write_state(raw)
+    write_state(raw, card_folder)
 
 
 def _strip_tags(text, tag):
@@ -173,7 +173,7 @@ def append_turn(card_folder, polished_input=None, content="", summary="", option
     write_content_js(card_folder)
 
     # Update state: increment generatedCount and accumulate totalTokens
-    state_raw = read_state()
+    state_raw = read_state(card_folder)
     new_count = (next_index + 1)
     state_raw = re.sub(r'(\s+generatedCount:\s*)\d+', rf'\g<1>{new_count}', state_raw)
     if tokens and tokens.get("total", 0) > 0:
@@ -182,7 +182,7 @@ def append_turn(card_folder, polished_input=None, content="", summary="", option
         prev_total = int(m.group(1)) if m else 0
         new_total = prev_total + tokens["total"]
         state_raw = re.sub(r'(\s+totalTokens:\s*)\d+', rf'\g<1>{new_total}', state_raw)
-    write_state(state_raw)
+    write_state(state_raw, card_folder)
 
     return next_index
 
@@ -204,10 +204,10 @@ def reroll_last(card_folder):
     write_content_js(card_folder)
 
     # Update generatedCount
-    state_raw = read_state()
+    state_raw = read_state(card_folder)
     new_count = len(log) + 2 if log else 1
     state_raw = re.sub(r'(\s+generatedCount:\s*)\d+', rf'\g<1>{new_count}', state_raw)
-    write_state(state_raw)
+    write_state(state_raw, card_folder)
 
     user_text = last.get("user", "")
     (STYLES / "input.txt").write_text(user_text, encoding="utf-8")
@@ -224,10 +224,10 @@ def delete_turns(card_folder, from_index):
 
     # Update generatedCount and clear pending
     (STYLES / ".pending").unlink(missing_ok=True)
-    state_raw = read_state()
+    state_raw = read_state(card_folder)
     new_count = len(log) + 2 if log else 1
     state_raw = re.sub(r'(\s+generatedCount:\s*)\d+', rf'\g<1>{new_count}', state_raw)
-    write_state(state_raw)
+    write_state(state_raw, card_folder)
 
 
 # ═══ Bridge Calls ═══

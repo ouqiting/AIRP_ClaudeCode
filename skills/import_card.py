@@ -265,6 +265,14 @@ def main():
 
         create_memory_index(memory_dir, result["card_name"], result["world_name"])
 
+    # 7.5 复制 state.js / content.js 模板到角色卡目录（不覆盖已有文件）
+    import shutil
+    for template_name in ("state.js", "content.js"):
+        src = os.path.join(styles_dir, template_name)
+        dst = os.path.join(card_dir, template_name)
+        if os.path.exists(src) and not os.path.exists(dst):
+            shutil.copy2(src, dst)
+
     # 8. 输出 JSON 摘要
     print(json.dumps(result, ensure_ascii=False))
 
