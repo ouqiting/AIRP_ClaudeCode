@@ -13,7 +13,10 @@
       "Bash(netstat -ano)",
       "Bash(taskkill //F //PID 35324 //PID 24392 //PID 34264 //PID 7780)",
       "Bash(curl -s http://localhost:8765/state.js)",
-      "Bash(curl -s http://localhost:8765/content.js)"
+      "Bash(curl -s http://localhost:8765/content.js)",
+      "Bash(echo -n \"D:/data/*\")",
+      "Bash(curl -s http://localhost:8765/api/openings)",
+      "Bash(export PYTHONIOENCODING=utf-8)"
     ]
   }
 }

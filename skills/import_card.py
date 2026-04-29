@@ -232,12 +232,13 @@ def main():
     with open(card_data_path, "w", encoding="utf-8") as f:
         json.dump(card_data, f, ensure_ascii=False, indent=2)
 
-    # 6. 生成 openings.json
+    # 6. 生成 openings.json（写入角色卡目录，不覆盖已有文件）
     openings = extract_openings(card_data)
     result["openings_count"] = len(openings)
-    openings_path = os.path.join(styles_dir, "openings.json")
-    with open(openings_path, "w", encoding="utf-8") as f:
-        json.dump(openings, f, ensure_ascii=False, indent=2)
+    openings_path = os.path.join(card_dir, "openings.json")
+    if not os.path.exists(openings_path):
+        with open(openings_path, "w", encoding="utf-8") as f:
+            json.dump(openings, f, ensure_ascii=False, indent=2)
 
     # 7. 处理世界书条目 → memory/
     entries = card_data.get("data", {}).get("character_book", {}).get("entries", [])

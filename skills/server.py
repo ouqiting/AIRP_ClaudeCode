@@ -180,7 +180,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
         # API: list available openings
         if parsed.path == "/api/openings":
-            openings = handler.list_openings()
+            card = _card_folder()
+            openings = handler.list_openings(card)
             self._json(openings)
             return
 

@@ -244,23 +244,33 @@ def bridge_done():
 OPENINGS_FILE = STYLES / "openings.json"
 
 
-def save_openings(openings):
+def _openings_path(card_folder=None):
+    if card_folder:
+        p = Path(card_folder) / "openings.json"
+        if p.exists():
+            return p
+    return OPENINGS_FILE
+
+
+def save_openings(openings, card_folder=None):
     """Save openings list to openings.json."""
-    with open(OPENINGS_FILE, "w", encoding="utf-8") as f:
+    path = Path(card_folder) / "openings.json" if card_folder else OPENINGS_FILE
+    with open(path, "w", encoding="utf-8") as f:
         json.dump(openings, f, ensure_ascii=False, indent=2)
 
 
-def list_openings():
+def list_openings(card_folder=None):
     """Return list of available openings."""
-    if OPENINGS_FILE.exists():
-        with open(OPENINGS_FILE, "r", encoding="utf-8") as f:
+    path = _openings_path(card_folder)
+    if path.exists():
+        with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
     return []
 
 
 def switch_opening(card_folder, opening_id):
     """Replace the current opening (index 0) with a different one."""
-    openings = list_openings()
+    openings = list_openings(card_folder)
     target = None
     for o in openings:
         if o["id"] == opening_id:
