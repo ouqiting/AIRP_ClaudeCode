@@ -74,6 +74,53 @@ def extract_openings(card_data: dict) -> list[dict]:
     return openings
 
 
+def extract_first_messages(card_data: dict, card_dir: str) -> dict:
+    """提取首条消息写入 first_message.txt，返回统计信息。
+
+    规则：
+    1. first_mes 有内容 → 直接提取为首选
+    2. first_mes 为空 → 从 alternate_greetings 中提取全部开头
+    3. 所有开头均写入 first_message.txt，供 Claude Code 询问用户选择
+    """
+    first_mes = card_data.get("first_mes", "") or card_data.get("data", {}).get("first_mes", "")
+    alt_greetings = card_data.get("alternate_greetings", []) or card_data.get("data", {}).get("alternate_greetings", [])
+
+    messages = []
+
+    if first_mes.strip():
+        messages.append({
+            "index": 0,
+            "source": "first_mes",
+            "content": first_mes.strip(),
+            "brief": first_mes.strip()[:50].replace("\n", " ")
+        })
+
+    for i, greeting in enumerate(alt_greetings):
+        if greeting.strip():
+            messages.append({
+                "index": len(messages),
+                "source": f"alternate_greetings[{i}]",
+                "content": greeting.strip(),
+                "brief": greeting.strip()[:50].replace("\n", " ")
+            })
+
+    if not messages:
+        return {"count": 0, "file_written": False}
+
+    # 写入 first_message.txt
+    output_path = os.path.join(card_dir, "first_message.txt")
+    lines = []
+    for msg in messages:
+        lines.append(f"=== 开头选项 {msg['index']} ({msg['source']}) ===\n")
+        lines.append(msg["content"])
+        lines.append("\n\n")
+
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.writelines(lines)
+
+    return {"count": len(messages), "file_written": True, "file_path": output_path}
+
+
 def get_card_name(card_data: dict) -> str:
     """提取角色卡名称。"""
     return card_data.get("data", {}).get("name", "") or card_data.get("name", "")
@@ -166,6 +213,7 @@ def main():
         "world_name": "",
         "source_type": "",
         "openings_count": 0,
+        "first_messages": {},
         "memory": {},
         "worldbook_entries_total": 0,
     }
@@ -231,6 +279,10 @@ def main():
     card_data_path = os.path.join(card_dir, ".card_data.json")
     with open(card_data_path, "w", encoding="utf-8") as f:
         json.dump(card_data, f, ensure_ascii=False, indent=2)
+
+    # 5.5 提取首条消息 → first_message.txt
+    first_msg_stats = extract_first_messages(card_data, card_dir)
+    result["first_messages"] = first_msg_stats
 
     # 6. 生成 openings.json（写入角色卡目录，不覆盖已有文件）
     openings = extract_openings(card_data)
