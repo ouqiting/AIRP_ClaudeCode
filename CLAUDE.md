@@ -14,6 +14,7 @@
 - 当前卡片文件夹（如 `{ROOT}/我的角色/`）下的 `chat_log.json`、`first_message.txt`、`state.js`、`content.js`、`openings.json`
 - 当前卡片文件夹下的 `memory/` 目录及其所有 `.md` 文件 — 跨会话记忆
 - `{ROOT}/skills/handler.py`, `{ROOT}/skills/server.py`, `{ROOT}/skills/poll.py`, `{ROOT}/skills/cleanup.py`
+- `{ROOT}/skills/ban_word.md` — 违禁词规则
 - `{ROOT}/STORY.md` — 叙事理论框架，剧情规划时读取
 - `{ROOT}/CLAUDE.md`
 
@@ -41,6 +42,7 @@
 - `python "{ROOT}/skills/handler.py" "<卡片文件夹>" [--opening]` — 处理回合 / 开局
 - `python "{ROOT}/skills/import_card.py" "<卡片文件夹>" "{ROOT}"` — 一键导入角色卡/世界书，解析 PNG/JSON/TXT 并初始化 memory
 - `python "{ROOT}/skills/token_collector.py" "{ROOT}"` — 采集 DeepSeek 真实 token 用量写入 response.txt
+- `python "{ROOT}/skills/ban_word_checker.py" "{ROOT}"` — 违禁词检测，扫描 response.txt 匹配 ban_word.md 规则，命中时报错提示 AI 修改
 - `python "{ROOT}/skills/cleanup.py"` — 一键清理：杀进程 + 释放端口 + 清除 pending 残留
 - `python -c "..."` — 临时脚本（字符编码修复、JSON 检查、进程管理等）
 - `sleep 2` — 等待服务器就绪
@@ -218,17 +220,20 @@ Bash: python "{ROOT}/skills/wait_for_input.py" (run_in_background, timeout=60000
    - **场景快照**：当前时间、地点、在场人物及各自状态（一句话概括）。润色结果替代原始输入参与后续生成。
 4. **思考流程**：走完下方「生成前思考流程」五步（内部思考）。翻记忆时依赖对话历史中已有的既往轮次内容——**不要重新读取 chat_log.json 或 memory 文件**。如果对话因压缩导致上下文缺失，最多只读 `memory/project.md` 的最新摘要。
 5. 生成叙事回复 + summary + options
-6. 按下方「输出格式」写入 `{ROOT}/skills/styles/response.txt`
-6.3 **Token 采集**：`python "{ROOT}/skills/token_collector.py" "{ROOT}"` → 从 Claude Code session transcript 读取最后一条 assistant 消息的 DeepSeek 真实 token 计数（in/out/total），附加到 response.txt 末尾。
-6.5 **字数门禁**（强制）：执行以下 Python 脚本统计 `<content>` 标签内的中文字数：
+6. **写入前必须先 Read response.txt**（Write 工具要求先读取过目标文件才能写入），然后按下方「输出格式」写入 `{ROOT}/skills/styles/response.txt`
+接下来，**并行运行**这三个检测程序(一定要并行检测，节省时间)
+6.1 **字数门禁**（强制）：执行以下 Python 脚本统计 `<content>` 标签内的中文字数：
    ```
    python -c "import re,json;txt=open('{ROOT}/skills/styles/response.txt',encoding='utf-8').read();m=re.search(r'<content>(.*?)</content>',txt,re.DOTALL);c=len(re.findall(r'[一-鿿㐀-䶿]',re.sub(r'<[^>]*>','',m.group(1) if m else '')));s=json.load(open('{ROOT}/skills/styles/settings.json',encoding='utf-8'));t=s.get('wordCount',600);print(f'字数: {c}/{t}');exit(0 if c>=t*0.8 else 1)"
    ```
-   若 exit code != 0（字数 < wordCount × 0.8）→ **重新生成本回复**（最多重试 3 次）。重试时使用括号强调：`(重要：本次回复必须达到 XXX 中文字，上版只有 YYY 字)`。扩充方向：增加感官细节、NPC 微反应、环境变化——禁止灌水重复。3 次仍不达标则保留最后一版，summary 末尾追加 `[字数未达标]`，继续执行。
-7. **交付前端**：执行 `python "{ROOT}/skills/handler.py" "<卡片文件夹绝对路径>"` → content.js 更新 → 前端 3 秒轮询拿到回复。handler.py 自动 /api/done 清除 pending。**用户已可看到回复，以下步骤异步后台完成，不阻塞前端。**
-8. **后台：更新剧情记忆**：将本轮进展写入当前卡片文件夹下 `memory/project.md`，更新 MEMORY.md 索引摘要。其他记忆文件按实际情况低频更新。
-9. **后台：检查剧情规划触发**：`generatedCount` 是 `PLAN_INTERVAL`（默认 8）的整数倍且 > 0？是 → 执行下方「剧情规划」流程；否 → 跳过
-10. **重启监听**：确保所有任务完成后，启动新的后台监听，等待用户下一轮输入：
+   若 exit code != 0（字数 < wordCount × 0.8）→ **修改扩写已生成的回复**（最多重试 3 次）。修改时使用括号强调：`(重要：本次回复必须达到 XXX 中文字，上版只有 YYY 字)`。扩充方向：增加感官细节、NPC 微反应、环境变化——禁止灌水重复。3 次仍不达标则保留最后一版，summary 末尾追加 `[字数未达标]`，继续执行。
+6.2 **违禁词检测**：`python "{ROOT}/skills/ban_word_checker.py" "{ROOT}"` → 根据 `skills/ban_word.md` 中的规则扫描 response.txt。检测到命中时脚本 exit code=1 并打印匹配的句子，AI 需判断是否违规并在 response.txt 中直接修改对应句子。修改后重新运行检测，直到通过（exit code=0）或 AI 判定为误报。
+6.3 **Token 采集**：`python "{ROOT}/skills/token_collector.py" "{ROOT}"` → 从 Claude Code session transcript 读取最后一条 assistant 消息的 DeepSeek 真实 token 计数（in/out/total），附加到 response.txt 末尾。
+
+1. **交付前端**：执行 `python "{ROOT}/skills/handler.py" "<卡片文件夹绝对路径>"` → content.js 更新 → 前端 3 秒轮询拿到回复。handler.py 自动 /api/done 清除 pending。**用户已可看到回复，以下步骤异步后台完成，不阻塞前端。**
+2. **后台：更新剧情记忆**：将本轮进展写入当前卡片文件夹下 `memory/project.md`，更新 MEMORY.md 索引摘要。其他记忆文件按实际情况低频更新。
+3. **后台：检查剧情规划触发**：`generatedCount` 是 `PLAN_INTERVAL`（默认 8）的整数倍且 > 0？是 → 执行下方「剧情规划」流程；否 → 跳过
+4.  **重启监听**：确保所有任务完成后，启动新的后台监听，等待用户下一轮输入：
    ```
    Bash: python "{ROOT}/skills/wait_for_input.py" (run_in_background, timeout=600000)
    ```
